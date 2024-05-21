@@ -3,15 +3,16 @@ document.getElementById('fetch-times').addEventListener('click', async () => {
     const end = document.getElementById('end').value;
     const startTime = document.getElementById('start-time').value || "00:00";
     const endTime = document.getElementById('end-time').value || "23:59";
+    const showFreeTimes = document.getElementById('free').checked;
 
     if (start && end) {
         try {
             const calendars = await listCalendars();
             const freeTimes = await getFreeTimes(start, end, startTime, endTime, calendars);
-            const formattedFreeTimes = formatFreeTimes(freeTimes, start, end, startTime, endTime);
-            document.getElementById('output').innerHTML = formattedFreeTimes;
+            const formattedTimes = formatTimes(freeTimes, start, end, startTime, endTime, showFreeTimes);
+            document.getElementById('output').innerHTML = formattedTimes;
         } catch (error) {
-            console.error('Error fetching free times:', error);
+            console.error('Error fetching times:', error);
         }
     } else {
         alert('Please select a start and end date.');
@@ -70,8 +71,8 @@ async function getToken() {
     });
 }
 
-function formatFreeTimes(calendars, start, end, startTime, endTime) {
-    let freeTimes = [];
+function formatTimes(calendars, start, end, startTime, endTime, showFreeTimes) {
+    let times = [];
     let currentDate = new Date(start);
     let endDate = new Date(end);
 
@@ -88,20 +89,30 @@ function formatFreeTimes(calendars, start, end, startTime, endTime) {
         }
 
         if (dayBusyTimes.length === 0) {
-            freeTimes.push(`${currentDate.toLocaleDateString(undefined, { weekday: 'long', month: 'numeric', day: 'numeric' })}<ul><li>${formatTime(startTime)} - ${formatTime(endTime)}</li></ul>`);
+            if (showFreeTimes) {
+                times.push(`${currentDate.toLocaleDateString(undefined, { weekday: 'long', month: 'numeric', day: 'numeric' })}<ul><li>${formatTime(startTime)} - ${formatTime(endTime)}</li></ul>`);
+            }
         } else {
-            let dayFreeTimes = getDayFreeTimes(currentDate, dayBusyTimes, startTime, endTime);
-            freeTimes.push(`${currentDate.toLocaleDateString(undefined, { weekday: 'long', month: 'numeric', day: 'numeric' })}<ul>`);
-            dayFreeTimes.forEach(freeTime => {
-                freeTimes.push(`<li>${freeTime}</li>`);
-            });
-            freeTimes.push('</ul>');
+            if (showFreeTimes) {
+                let dayFreeTimes = getDayFreeTimes(currentDate, dayBusyTimes, startTime, endTime);
+                times.push(`${currentDate.toLocaleDateString(undefined, { weekday: 'long', month: 'numeric', day: 'numeric' })}<ul>`);
+                dayFreeTimes.forEach(freeTime => {
+                    times.push(`<li>${freeTime}</li>`);
+                });
+                times.push('</ul>');
+            } else {
+                times.push(`${currentDate.toLocaleDateString(undefined, { weekday: 'long', month: 'numeric', day: 'numeric' })}<ul>`);
+                dayBusyTimes.forEach(busyTime => {
+                    times.push(`<li>${formatTime(new Date(busyTime.start).toTimeString().slice(0, 5))} - ${formatTime(new Date(busyTime.end).toTimeString().slice(0, 5))}</li>`);
+                });
+                times.push('</ul>');
+            }
         }
 
         currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    return freeTimes.join('');
+    return times.join('');
 }
 
 function getDayFreeTimes(currentDate, busyTimes, startTime, endTime) {

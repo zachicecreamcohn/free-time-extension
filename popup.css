@@ -76,3 +76,8 @@ pre {
 .fields > div {
     width: 100%;
 }
+
+.conflict-free {
+    display: flex;
+    flex-direction: row;
+}
