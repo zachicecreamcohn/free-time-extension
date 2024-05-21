@@ -6,7 +6,8 @@ document.getElementById('fetch-times').addEventListener('click', async () => {
 
     if (start && end) {
         try {
-            const freeTimes = await getFreeTimes(start, end, startTime, endTime);
+            const calendars = await listCalendars();
+            const freeTimes = await getFreeTimes(start, end, startTime, endTime, calendars);
             const formattedFreeTimes = formatFreeTimes(freeTimes, start, end, startTime, endTime);
             document.getElementById('output').innerHTML = formattedFreeTimes;
         } catch (error) {
@@ -26,7 +27,19 @@ document.getElementById('copy').addEventListener('click', () => {
     }, 1000);
 });
 
-async function getFreeTimes(start, end, startTime, endTime) {
+async function listCalendars() {
+    const token = await getToken();
+    const response = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    const data = await response.json();
+    return data.items.map(calendar => calendar.id);
+}
+
+async function getFreeTimes(start, end, startTime, endTime, calendarIds) {
     const token = await getToken();
     const response = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
         method: 'POST',
@@ -37,12 +50,12 @@ async function getFreeTimes(start, end, startTime, endTime) {
         body: JSON.stringify({
             timeMin: new Date(`${start}T${startTime}`).toISOString(),
             timeMax: new Date(`${end}T${endTime}`).toISOString(),
-            items: [{ id: 'primary' }]
+            items: calendarIds.map(id => ({ id }))
         })
     });
 
     const data = await response.json();
-    return data.calendars.primary.busy;
+    return data.calendars;
 }
 
 async function getToken() {
@@ -57,16 +70,22 @@ async function getToken() {
     });
 }
 
-function formatFreeTimes(busyTimes, start, end, startTime, endTime) {
+function formatFreeTimes(calendars, start, end, startTime, endTime) {
     let freeTimes = [];
     let currentDate = new Date(start);
     let endDate = new Date(end);
 
     while (currentDate <= endDate) {
-        let dayBusyTimes = busyTimes.filter(b => {
-            let busyStart = new Date(b.start);
-            return busyStart.toDateString() === currentDate.toDateString();
-        });
+        let dayBusyTimes = [];
+        for (const calendarId in calendars) {
+            let calendarBusyTimes = calendars[calendarId].busy;
+            calendarBusyTimes.forEach(busy => {
+                let busyStart = new Date(busy.start);
+                if (busyStart.toDateString() === currentDate.toDateString()) {
+                    dayBusyTimes.push(busy);
+                }
+            });
+        }
 
         if (dayBusyTimes.length === 0) {
             freeTimes.push(`${currentDate.toLocaleDateString(undefined, { weekday: 'long', month: 'numeric', day: 'numeric' })}<ul><li>${formatTime(startTime)} - ${formatTime(endTime)}</li></ul>`);
