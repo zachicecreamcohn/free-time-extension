@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Calendar Free Time Inserter",
+  "version": "1.0",
+  "permissions": [
+    "identity",
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "oauth2": {
+    "client_id": "419399379131-sme5mdpb0icvdco3ofaeq9odk167i3qk.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/calendar.readonly",
+      "https://www.googleapis.com/auth/gmail.compose"
+    ]
+  }
+}
