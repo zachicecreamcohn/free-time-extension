@@ -1,14 +1,27 @@
+let calendarsList = [];
+
+window.onload = async () => {
+    calendarsList= await listCalendars();
+    // Initialize the multi-select dropdown
+    MultiSelectDropdown({
+        search: true,
+        placeholder: 'Calendars to exclude...',
+    });
+}
+
+
 document.getElementById('fetch-times').addEventListener('click', async () => {
     const start = document.getElementById('start').value;
     const end = document.getElementById('end').value;
     const startTime = document.getElementById('start-time').value || "00:00";
     const endTime = document.getElementById('end-time').value || "23:59";
     const showFreeTimes = document.getElementById('free').checked;
-
+    const excludedCalendars = Array.from(document.getElementById('calendar-select').selectedOptions).map(option => option.value);
+    console.log('Excluded Calendars:', excludedCalendars);
     if (start && end) {
         try {
-            const calendars = await listCalendars();
-            const freeTimes = await getFreeTimes(start, end, startTime, endTime, calendars);
+            const filteredCalendars = calendarsList.filter(calendar => !excludedCalendars.includes(calendar));
+            const freeTimes = await getFreeTimes(start, end, startTime, endTime, filteredCalendars);
             const formattedTimes = formatTimes(freeTimes, start, end, startTime, endTime, showFreeTimes);
             document.getElementById('output').innerHTML = formattedTimes;
         } catch (error) {
@@ -29,6 +42,7 @@ document.getElementById('copy').addEventListener('click', () => {
 });
 
 async function listCalendars() {
+    console.log('Fetching Calendars...');
     const token = await getToken();
     const response = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
         headers: {
@@ -37,8 +51,23 @@ async function listCalendars() {
     });
 
     const data = await response.json();
+    const calendarSelect = document.getElementById('calendar-select');
+    calendarSelect.innerHTML = ''; // Clear any existing options
+
+    data.items.forEach(calendar => {
+        const option = document.createElement('option');
+        option.value = calendar.id;
+        option.text = calendar.summary;
+        calendarSelect.appendChild(option);
+    });
+
+    console.log('Fetched Calendars:', data.items);
+
     return data.items.map(calendar => calendar.id);
 }
+
+
+
 
 async function getFreeTimes(start, end, startTime, endTime, calendarIds) {
     const token = await getToken();
