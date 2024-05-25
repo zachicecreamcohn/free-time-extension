@@ -42,6 +42,13 @@ async function listCalendars() {
 
 async function getFreeTimes(start, end, startTime, endTime, calendarIds) {
     const token = await getToken();
+    const timeMin = parseDateString(start, startTime).toISOString();
+    const timeMax = parseDateString(end, endTime).toISOString();
+
+    console.log('Fetching Free Times with the following parameters:');
+    console.log('Start:', timeMin);
+    console.log('End:', timeMax);
+
     const response = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
         method: 'POST',
         headers: {
@@ -49,8 +56,8 @@ async function getFreeTimes(start, end, startTime, endTime, calendarIds) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            timeMin: new Date(`${start}T${startTime}`).toISOString(),
-            timeMax: new Date(`${end}T${endTime}`).toISOString(),
+            timeMin: timeMin,
+            timeMax: timeMax,
             items: calendarIds.map(id => ({ id }))
         })
     });
@@ -58,6 +65,7 @@ async function getFreeTimes(start, end, startTime, endTime, calendarIds) {
     const data = await response.json();
     return data.calendars;
 }
+
 
 async function getToken() {
     return new Promise((resolve, reject) => {
@@ -70,13 +78,18 @@ async function getToken() {
         });
     });
 }
-
 function formatTimes(calendars, start, end, startTime, endTime, showFreeTimes) {
     let times = [];
-    let currentDate = new Date(start);
-    let endDate = new Date(end);
+    let currentDate = parseDateString(start, "00:00");
+    let endDate = parseDateString(end, "23:59");
+
+    console.log('Formatting times for the date range:');
+    console.log('Start Date:', currentDate);
+    console.log('End Date:', endDate);
 
     while (currentDate <= endDate) {
+        console.log('Processing Date:', currentDate);
+
         let dayBusyTimes = [];
         for (const calendarId in calendars) {
             let calendarBusyTimes = calendars[calendarId].busy;
@@ -110,10 +123,12 @@ function formatTimes(calendars, start, end, startTime, endTime, showFreeTimes) {
         }
 
         currentDate.setDate(currentDate.getDate() + 1);
+        currentDate.setHours(0, 0, 0, 0);  // Reset time to start of the day
     }
 
     return times.join('');
 }
+
 
 function getDayFreeTimes(currentDate, busyTimes, startTime, endTime) {
     let freeTimes = [];
@@ -139,20 +154,30 @@ function getDayFreeTimes(currentDate, busyTimes, startTime, endTime) {
         let endOfBusy = new Date(busy.end);
 
         if (startOfBusy > previousEnd) {
-            freeTimes.push(`${formatTime(previousEnd.toTimeString().slice(0, 5))} - ${formatTime(startOfBusy.toTimeString().slice(0, 5))}`);
+            if (startOfBusy > endOfDay) {
+                // If the next busy time starts after the end of the day, add free time till endOfDay
+                freeTimes.push(`${formatTime(previousEnd.toTimeString().slice(0, 5))} - ${formatTime(endOfDay.toTimeString().slice(0, 5))}`);
+            } else {
+                // Add free time until the next busy time starts
+                freeTimes.push(`${formatTime(previousEnd.toTimeString().slice(0, 5))} - ${formatTime(startOfBusy.toTimeString().slice(0, 5))}`);
+            }
         }
 
+        // Move the previous end to the end of the current busy period
         if (endOfBusy > previousEnd) {
             previousEnd = endOfBusy;
         }
     });
 
+    // Add any remaining free time at the end of the day
     if (previousEnd < endOfDay) {
         freeTimes.push(`${formatTime(previousEnd.toTimeString().slice(0, 5))} - ${formatTime(endOfDay.toTimeString().slice(0, 5))}`);
     }
 
     return freeTimes;
 }
+
+
 
 function formatTime(time) {
     let [hour, minute] = time.split(':').map(Number);
@@ -165,4 +190,11 @@ function copyToClipboard(html) {
     const blob = new Blob([html], { type: 'text/html' });
     const clipboardItem = new ClipboardItem({ 'text/html': blob });
     navigator.clipboard.write([clipboardItem]);
+}
+
+function parseDateString(dateString, timeString) {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const date = new Date(year, month - 1, day, hours, minutes);
+    return date;
 }
